@@ -1,0 +1,7 @@
+# Private — never upload
+my-plan.json
+north-star-backup-*.json
+*.backup.json
+
+# Local tooling
+.claude/
