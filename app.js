@@ -2,6 +2,7 @@
 'use strict';
 
 const KEY = 'northstar.v1';
+const APP_VERSION = 4; // keep in step with VERSION in sw.js
 const MAX_TODAY = 3;
 const AREA_ORDER = ['family', 'side', 'money', 'career', 'growth']; // priority for Today suggestions
 
@@ -749,7 +750,7 @@ function vSettings() {
 
   <div class="h2"><span>Start over</span></div>
   <button class="btn danger block" data-act="reset">Reset to the starter plan</button>
-  <p class="tiny muted" style="margin:16px 4px;text-align:center">North Star · works offline · your data never leaves this device</p>
+  <p class="tiny muted" style="margin:16px 4px;text-align:center">North Star · version ${APP_VERSION} · works offline · your data never leaves this device</p>
   `;
 }
 
@@ -1019,7 +1020,20 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault(); render();
 });
 
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+// Updates: check for a new version every time the app comes to the front, and reload once when it arrives.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return; // first install: nothing to refresh
+    reloading = true; location.reload();
+  });
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(() => {});
+}
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
 
 applyTheme();
