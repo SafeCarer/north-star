@@ -1,6 +1,6 @@
 // North Star service worker — makes the app work fully offline.
 // Bump VERSION whenever you change app files so phones pick up the update.
-const VERSION = 'northstar-v1';
+const VERSION = 'northstar-v2';
 const SHELL = [
   './',
   './index.html',

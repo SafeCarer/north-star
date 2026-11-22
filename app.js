@@ -361,7 +361,8 @@ function vHome() {
   return `
   <div class="top">
     <div><div class="sub">${new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}</div><h1>Hi${P().name ? ' ' + esc(P().name) : ' there'}</h1></div>
-    <a class="icon-btn" href="#settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
+    <div style="display:flex">${LK ? '<button class="icon-btn" data-act="lockNow" aria-label="Lock now" title="Lock now">🔒</button>' : ''}
+    <a class="icon-btn" href="#settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a></div>
   </div>
 
   <section class="hero" aria-label="North Star">
@@ -586,6 +587,7 @@ function vTrackers(k) {
   ${cfg.cycle ? '<p class="tiny muted" style="margin:0 4px">Tip: tap a status to move it to the next stage.</p>' : ''}
   `;
 }
+const pinInput = (name, label) => `<label class="f">${label}</label><input type="password" name="${name}" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" required>`;
 function field(f) {
   const id = `f_${f.k}`;
   if (f.type === 'select') return `<select id="${id}" name="${f.k}">${f.opts.map((o) => `<option ${o === f.def ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`;
@@ -612,6 +614,29 @@ function vSettings() {
   <div class="h2"><span>Appearance</span></div>
   <div class="seg">${['auto', 'light', 'dark'].map((v) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-v="${v}">${v === 'auto' ? 'Auto' : v === 'light' ? '☀️ Light' : '🌙 Dark'}</button>`).join('')}</div>
 
+  <div class="h2"><span>App lock</span></div>
+  <div class="card">
+    ${!canLock() ? '<p class="small muted">PIN lock needs the installed app (https). Open North Star from your home screen.</p>'
+    : LK ? `
+      <p><b>🔒 PIN lock is on</b></p>
+      <p class="small muted" style="margin:4px 0 12px">North Star asks for your PIN when you open it, or after 1 minute away.</p>
+      <button class="btn block" data-act="lockNow">Lock now</button>
+      <details style="margin-top:12px"><summary class="small" style="min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--accent);font-weight:600">Change PIN</summary>
+        <form data-form="changePin">
+          ${pinInput('cur', 'Current PIN')}${pinInput('pin1', 'New PIN (4–6 digits)')}${pinInput('pin2', 'New PIN again')}
+          <button class="btn block" style="margin-top:12px">Change PIN</button>
+        </form></details>
+      <details><summary class="small" style="min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--danger);font-weight:600">Turn off PIN lock</summary>
+        <form data-form="offPin">${pinInput('cur', 'Current PIN')}<button class="btn danger block" style="margin-top:12px">Turn off</button></form></details>`
+    : `
+      <p class="small muted" style="margin-bottom:4px">Keep your plan private if someone picks up your phone. North Star will ask for this PIN when you open it, or after 1 minute away.</p>
+      <form data-form="setPin">
+        ${pinInput('pin1', 'Choose a PIN (4–6 digits)')}${pinInput('pin2', 'Type it again')}
+        <button class="btn block" style="margin-top:12px">🔒 Turn on PIN lock</button>
+      </form>
+      <p class="tiny muted" style="margin-top:10px">Forgot it later? You can reset, which erases the app’s data on this phone. Then import your latest backup. So keep exporting backups.</p>`}
+  </div>
+
   <div class="h2"><span>Backup</span></div>
   <div class="card">
     <p class="small muted" style="margin-bottom:12px">Your plan lives only on this device. Export a backup now and then (save it to OneDrive or email it to yourself). Import it to move to a new phone.</p>
@@ -633,6 +658,55 @@ function vSettings() {
   `;
 }
 
+/* ---------------- PIN lock ----------------
+   Stored separately from the plan, so backups never carry the PIN and importing never removes it.
+   Only a salted hash of the PIN is kept. This is a privacy screen, not encryption. */
+const LOCK_KEY = 'northstar.lock';
+const LOCK_AFTER_MS = 60 * 1000; // lock again after 1 minute away
+let LK = (() => { try { return JSON.parse(localStorage.getItem(LOCK_KEY) || 'null'); } catch (e) { return null; } })();
+let locked = !!LK;
+let pinBuf = '', pinMsg = '', pinShake = false, hiddenAt = 0, checking = false;
+const saveLock = () => { try { if (LK) localStorage.setItem(LOCK_KEY, JSON.stringify(LK)); else localStorage.removeItem(LOCK_KEY); } catch (e) {} };
+const canLock = () => !!(window.crypto && crypto.subtle);
+async function hashPin(pin, salt) {
+  const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${salt}:${pin}`));
+  return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+const validPin = (p) => /^\d{4,6}$/.test(p);
+async function setPin(pin) {
+  const salt = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  LK = { hash: await hashPin(pin, salt), salt, len: pin.length, fails: 0, waitUntil: 0 }; saveLock();
+}
+async function pinMatches(pin) { return !!LK && (await hashPin(pin, LK.salt)) === LK.hash; }
+const waitLeft = () => (LK ? Math.max(0, Math.ceil((LK.waitUntil - Date.now()) / 1000)) : 0);
+
+function vLock() {
+  const w = waitLeft();
+  const dots = Array.from({ length: LK.len }, (_, i) => `<i class="${i < pinBuf.length ? 'on' : ''}"></i>`).join('');
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+  return `<div class="lock-inner" role="dialog" aria-label="Enter PIN">
+    ${STAR}<h2>North Star</h2><div class="lsub">Enter your PIN</div>
+    <div class="pin-dots ${pinShake ? 'shake' : ''}">${dots}</div>
+    <div class="lock-msg" aria-live="assertive">${w ? `Too many tries. Wait ${w}s.` : esc(pinMsg)}</div>
+    <div class="keypad">${keys.map((k) => k === '' ? '<span></span>'
+      : `<button class="${k === 'del' ? 'plain' : ''}" data-act="pin" data-k="${k}" aria-label="${k === 'del' ? 'Delete' : k}">${k === 'del' ? '⌫' : k}</button>`).join('')}</div>
+    <button class="lock-link" data-act="forgotPin">Forgot PIN?</button>
+  </div>`;
+}
+async function tryUnlock(pin) {
+  checking = true;
+  const ok = await pinMatches(pin);
+  checking = false; pinBuf = '';
+  if (ok) { locked = false; pinMsg = ''; LK.fails = 0; LK.waitUntil = 0; saveLock(); }
+  else {
+    LK.fails = (LK.fails || 0) + 1;
+    if (LK.fails >= 5) LK.waitUntil = Date.now() + Math.min(300, 30 * 2 ** (LK.fails - 5)) * 1000; // 30s, 60s … max 5 min
+    saveLock(); pinMsg = 'Wrong PIN — try again'; pinShake = true;
+    setTimeout(() => { pinShake = false; }, 400);
+  }
+  render();
+}
+
 /* ---------------- actions ---------------- */
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.add('show');
@@ -644,6 +718,22 @@ const cheer = () => toast(CHEERS[Math.floor(Math.random() * CHEERS.length)]);
 function setTaskDone(t, v) { t.done = v; t.doneAt = v ? todayKey() : null; if (v) cheer(); }
 
 const ACT = {
+  pin: (d) => {
+    if (!locked || checking) return;
+    if (waitLeft()) return;
+    pinMsg = '';
+    if (d.k === 'del') { pinBuf = pinBuf.slice(0, -1); return; }
+    if (pinBuf.length >= LK.len) return;
+    pinBuf += d.k;
+    if (pinBuf.length === LK.len) tryUnlock(pinBuf);
+  },
+  forgotPin: () => {
+    if (!confirm('Forgot your PIN?\n\nTo keep your plan private, this ERASES North Star’s data on this phone and removes the PIN. You can then import your plan or latest backup again.\n\nContinue?')) return;
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    LK = null; saveLock(); locked = false; pinBuf = ''; pinMsg = '';
+    S = seed(); toast('Reset. Import your plan to continue.');
+  },
+  lockNow: () => { if (LK) { locked = true; pinBuf = ''; pinMsg = ''; window.scrollTo(0, 0); } },
   toggleTask: (d) => { const f = findTask(d.id); if (f) setTaskDone(f.task, !f.task.done); },
   toggleCustom: (d) => { const it = ensureDay().items.find((x) => x.id === d.id); if (it) { it.done = !it.done; if (it.done) cheer(); } },
   toggleBig: (d) => {
@@ -703,6 +793,23 @@ const ACT = {
 };
 
 const FORMS = {
+  setPin: async (f, fd) => {
+    const a = String(fd.get('pin1') || ''), b = String(fd.get('pin2') || '');
+    if (!validPin(a)) return toast('PIN must be 4–6 digits');
+    if (a !== b) return toast('The two PINs don’t match');
+    await setPin(a); toast('🔒 PIN lock is on'); render();
+  },
+  changePin: async (f, fd) => {
+    const cur = String(fd.get('cur') || ''), a = String(fd.get('pin1') || ''), b = String(fd.get('pin2') || '');
+    if (!(await pinMatches(cur))) return toast('Current PIN is wrong');
+    if (!validPin(a)) return toast('New PIN must be 4–6 digits');
+    if (a !== b) return toast('The two new PINs don’t match');
+    await setPin(a); toast('PIN changed ✓'); render();
+  },
+  offPin: async (f, fd) => {
+    if (!(await pinMatches(String(fd.get('cur') || '')))) return toast('PIN is wrong');
+    LK = null; saveLock(); toast('PIN lock turned off'); render();
+  },
   addTask: (f, fd) => {
     const title = (fd.get('title') || '').trim(); if (!title) return;
     for (const a of S.areas) { const g = a.goals.find((x) => x.id === f.dataset.goal); if (g) g.tasks.push({ id: uid(), title, size: 'quick', done: false, doneAt: null }); }
@@ -741,6 +848,16 @@ const FORMS = {
 /* ---------------- render & wiring ---------------- */
 function route() { const [v, arg] = (location.hash.slice(1) || 'home').split('/'); return { v, arg }; }
 function render() {
+  const lockEl = $('#lock');
+  if (locked && LK) {
+    document.body.classList.add('locked');
+    $('#app').innerHTML = ''; // nothing private stays on screen behind the lock
+    lockEl.innerHTML = vLock(); lockEl.hidden = false;
+    return;
+  }
+  locked = false;
+  document.body.classList.remove('locked');
+  lockEl.hidden = true; lockEl.innerHTML = '';
   const { v, arg } = route();
   const views = { home: vHome, today: vToday, review: vReview, trackers: () => vTrackers(arg), area: () => vArea(arg), settings: vSettings };
   // keep open <details> state across re-renders
@@ -781,8 +898,20 @@ $('#importFile').addEventListener('change', async (e) => {
 window.addEventListener('hashchange', () => { ui.addOpen = false; ui.edit = false; render(); window.scrollTo(0, 0); });
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; if (route().v === 'settings') render(); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
-// New day while the app sits open → refresh Today
-document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+// Leaving the app: hide content (keeps it out of the app switcher). Coming back: lock if away > 1 min,
+// and refresh (a new day may have started).
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); if (LK) document.body.classList.add('veil'); return; }
+  if (LK && hiddenAt && Date.now() - hiddenAt > LOCK_AFTER_MS) { locked = true; pinBuf = ''; pinMsg = ''; }
+  document.body.classList.remove('veil');
+  render();
+});
+// Physical keyboard support on the lock screen
+document.addEventListener('keydown', (e) => {
+  if (!locked || !LK) return;
+  if (/^\d$/.test(e.key)) ACT.pin({ k: e.key }); else if (e.key === 'Backspace') ACT.pin({ k: 'del' }); else return;
+  e.preventDefault(); render();
+});
 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});

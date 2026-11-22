@@ -302,5 +302,33 @@ details.add[open] > summary { margin-bottom: 4px; }
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------- PIN lock ---------- */
+body.locked #app, body.locked .nav, body.veil #app, body.veil .nav { visibility: hidden; }
+#lock {
+  position: fixed; inset: 0; z-index: 50; color: #fff; overflow-y: auto;
+  background: radial-gradient(120% 70% at 100% 0%, #3b4f92 0%, transparent 60%), linear-gradient(160deg, #141b33, #2e3e72);
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 20px) 24px calc(env(safe-area-inset-bottom) + 20px);
+}
+#lock[hidden] { display: none; }
+.lock-inner { width: 100%; max-width: 320px; text-align: center; }
+.lock-inner .star-svg { width: 44px; height: 44px; }
+.lock-inner h2 { font-size: 22px; margin: 8px 0 2px; }
+.lock-inner .lsub { color: rgba(255,255,255,.7); font-size: 15px; }
+.pin-dots { display: flex; justify-content: center; gap: 16px; margin: 26px 0 10px; }
+.pin-dots i { width: 15px; height: 15px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); }
+.pin-dots i.on { background: #fff; }
+.pin-dots.shake { animation: shake .35s; }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.lock-msg { min-height: 22px; font-size: 14px; color: #ffd28a; }
+.keypad { display: grid; grid-template-columns: repeat(3, 76px); justify-content: center; gap: 16px 24px; margin-top: 14px; }
+.keypad button {
+  width: 76px; height: 76px; border-radius: 50%; border: 0; background: rgba(255,255,255,.12); color: #fff;
+  font-size: 30px; font-weight: 400;
+}
+.keypad button:active { background: rgba(255,255,255,.3); }
+.keypad button.plain { background: transparent; font-size: 22px; }
+.lock-link { margin-top: 22px; background: none; border: 0; color: rgba(255,255,255,.75); font-size: 14px; min-height: 44px; text-decoration: underline; }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 @media (min-width: 600px) { #app { padding-top: 28px; } }
