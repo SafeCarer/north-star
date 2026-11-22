@@ -1,6 +1,6 @@
 // North Star service worker — makes the app work fully offline.
 // Bump VERSION whenever you change app files so phones pick up the update.
-const VERSION = 'northstar-v2';
+const VERSION = 'northstar-v3';
 const SHELL = [
   './',
   './index.html',
@@ -29,6 +29,11 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  // Calendar reminders: the page stores a generated .ics in Cache Storage, we serve it from our https URL
+  if (/\/cal\/[^/]+\.ics$/.test(new URL(req.url).pathname)) {
+    e.respondWith(caches.match(req).then((r) => r || new Response('This reminder link has expired. Tap the button in North Star again.', { status: 404 })));
+    return;
+  }
   e.respondWith(
     caches.open(VERSION).then(async (cache) => {
       const cached = await cache.match(req, { ignoreSearch: true });

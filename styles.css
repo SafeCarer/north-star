@@ -302,6 +302,15 @@ details.add[open] > summary { margin-bottom: 4px; }
 }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------- due dates ---------- */
+.pill.danger { background: color-mix(in srgb, var(--danger) 15%, var(--surface)); color: var(--danger); }
+.pill.due { position: relative; cursor: pointer; min-height: 28px; }
+.pill.due input {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;
+  font-size: 16px; border: 0; padding: 0; min-height: 0; -webkit-appearance: none; appearance: none;
+}
+.task .hint .pill { margin-right: 2px; }
+
 /* ---------- PIN lock ---------- */
 body.locked #app, body.locked .nav, body.veil #app, body.veil .nav { visibility: hidden; }
 #lock {

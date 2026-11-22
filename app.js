@@ -201,7 +201,12 @@ function candidates(prof, exclude) {
   const ok = (t) => t && !t.done && !exclude.has(t.id) && prof.sizes.includes(t.size);
   const out = [];
   const push = (t) => { if (ok(t) && !out.includes(t)) out.push(t); };
-  (week(planWeek()).big3 || []).forEach((b) => b.taskId && push(findTask(b.taskId)?.task)); // Big 3 first
+  // 1) Overdue or due within 2 days — even Focus steps on a weekday, because the date matters most
+  upcoming(2).forEach(({ t }) => { if (!t.done && !exclude.has(t.id) && !out.includes(t)) out.push(t); });
+  // 2) Due this week (that fit today's size)
+  upcoming(7).forEach(({ t }) => push(t));
+  // 3) This week's Big 3
+  (week(planWeek()).big3 || []).forEach((b) => b.taskId && push(findTask(b.taskId)?.task));
   const lists = AREA_ORDER.map((id) => {
     const a = area(id); if (!a) return [];
     return a.goals.filter((g) => g.status !== 'paused').map((g) => g.tasks.find((t) => !t.done)).filter(Boolean);
@@ -231,7 +236,7 @@ function dayItems(day) {
   return day.items.map((it, i) => {
     if (it.custom) return { i, custom: true, id: it.id, title: it.title, done: it.done, areaId: 'none' };
     const f = findTask(it.taskId); if (!f) return null;
-    return { i, id: f.task.id, title: f.task.title, done: f.task.done, size: f.task.size, areaId: f.area.id, area: f.area };
+    return { i, id: f.task.id, title: f.task.title, done: f.task.done, size: f.task.size, due: f.task.due, areaId: f.area.id, area: f.area };
   }).filter(Boolean);
 }
 const usedIds = (day) => new Set([...day.items.filter((x) => x.taskId).map((x) => x.taskId), ...day.skipped]);
@@ -388,6 +393,19 @@ function vHome() {
     <span class="big">☀️</span><div><b>Today · ${tDone} of ${items.length} done</b><div class="small muted">${items.length ? esc((items.find((x) => !x.done) || items[0]).title) : profile().kind === 'rest' ? 'Rest day — just your Sunday Review' : 'Nothing planned yet'}</div></div><span class="arrow">›</span>
   </a>
 
+  ${(() => { const up = upcoming(7); if (!up.length) return ''; return `
+  <div class="h2"><span>Coming up</span><span class="tiny" style="text-transform:none;letter-spacing:0">${up.length} in the next 7 days</span></div>
+  <div class="card tight list">
+    ${up.slice(0, 5).map(({ t, a }) => { const info = dueInfo(t.due); return `
+      <div class="task a-${a.id}">
+        <button class="check" data-act="toggleTask" data-id="${t.id}" aria-label="Done">${TICK}</button>
+        <div class="body"><div class="title">${esc(t.title)}</div>
+          <div class="hint"><span class="pill ${info.cls}">${esc(info.text)}</span><span class="dot"></span>${esc(a.name)}</div></div>
+        <button class="icon-btn" data-act="cal" data-id="${t.id}" aria-label="Add reminder to Calendar" title="Remind me">🔔</button>
+      </div>`; }).join('')}
+    ${up.length > 5 ? `<div class="empty tiny">+ ${up.length - 5} more</div>` : ''}
+  </div>`; })()}
+
   <div class="h2"><span>This week’s Big 3 · ${weekRange(pw)}</span><a href="#review">Edit</a></div>
   <div class="card tight list">
     ${b3.length ? b3.map((b, i) => bigRow(b, i, pw)).join('') : `<div class="empty">No Big 3 yet. <a href="#review">Set them in Review</a></div>`}
@@ -442,7 +460,7 @@ function vToday() {
       <div class="task a-${x.areaId} ${x.done ? 'done' : ''}">
         <button class="check" data-act="${x.custom ? 'toggleCustom' : 'toggleTask'}" data-id="${x.id}" aria-label="Done">${TICK}</button>
         <div class="body"><div class="title">${esc(x.title)}</div>
-          <div class="hint">${x.area ? `<span class="dot"></span>${esc(x.area.name)} ·` : ''} ${esc(prof.slots[x.i] || '')}</div></div>
+          <div class="hint">${x.due && !x.done ? `<span class="pill ${dueInfo(x.due).cls}">${esc(dueInfo(x.due).text)}</span>` : ''}${x.area ? `<span class="dot"></span>${esc(x.area.name)} ·` : ''} ${esc(prof.slots[x.i] || '')}</div></div>
         ${x.done ? '' : `${x.custom ? '' : `<button class="icon-btn" data-act="swap" data-i="${x.i}" aria-label="Swap for another task" title="Swap">⇄</button>`}
         <button class="icon-btn" data-act="removeToday" data-i="${x.i}" aria-label="Remove from today" title="Remove">✕</button>`}
       </div>`).join('')}
@@ -486,7 +504,8 @@ function vArea(id) {
       ${g.tasks.map((t) => `
         <div class="task ${t.done ? 'done' : ''}">
           <button class="check" data-act="toggleTask" data-id="${t.id}" aria-label="Done">${TICK}</button>
-          <div class="body"><div class="title">${esc(t.title)}</div></div>
+          <div class="body"><div class="title">${esc(t.title)}</div>
+            ${t.due || ui.edit ? `<div class="hint">${dueInput(t)}${t.due && !t.done ? calBtn(t) : ''}</div>` : ''}</div>
           <button class="pill ${t.size === 'focus' ? 'c' : ''}" data-act="toggleSize" data-id="${t.id}" title="Quick ≈ 15 min · Focus ≈ 30–60 min">${t.size === 'focus' ? 'Focus' : 'Quick'}</button>
           ${ui.edit ? `<button class="icon-btn" data-act="delTask" data-id="${t.id}" aria-label="Delete task">🗑</button>` : ''}
         </div>`).join('')}
@@ -497,7 +516,7 @@ function vArea(id) {
 
   ${ui.edit ? `<div class="card"><form data-form="addGoal" data-area="${a.id}"><label class="f">New goal</label><div class="inline"><input type="text" name="title" placeholder="e.g. Open a TFSA" maxlength="120" required><button class="btn">Add</button></div></form></div>` : ''}
   <button class="btn ghost block" data-act="editMode">${ui.edit ? 'Done editing' : 'Edit goals'}</button>
-  <p class="tiny muted" style="margin:12px 4px">Tip: tap “Quick/Focus” to change a step’s size. Weekdays only suggest Quick steps; Saturday mornings get one Focus step.</p>
+  <p class="tiny muted" style="margin:12px 4px">Tip: tap a due date to change it (tap “Edit goals” to add dates to other steps). Tap 📅 to add a reminder to your iPhone Calendar. Tap “Quick/Focus” to change a step’s size. Weekdays only suggest Quick steps; Saturday mornings get one Focus step.</p>
   `;
 }
 
@@ -587,6 +606,73 @@ function vTrackers(k) {
   ${cfg.cycle ? '<p class="tiny muted" style="margin:0 4px">Tip: tap a status to move it to the next stage.</p>' : ''}
   `;
 }
+/* ---------------- due dates ---------------- */
+function dueInfo(due) {
+  const d = daysUntil(due);
+  if (d < 0) return { text: `Overdue · ${fmt(due)}`, cls: 'danger' };
+  if (d === 0) return { text: 'Due today', cls: 'danger' };
+  if (d === 1) return { text: 'Due tomorrow', cls: 'warn' };
+  if (d < 7) return { text: `Due ${parse(due).toLocaleDateString('en-CA', { weekday: 'short' })} ${fmt(due)}`, cls: d <= 3 ? 'warn' : '' };
+  return { text: `Due ${fmt(due)}`, cls: '' };
+}
+// A pill that opens the native date picker when tapped (the invisible date input sits on top of it)
+function dueInput(t) {
+  const info = t.due ? dueInfo(t.due) : null;
+  const cls = t.done ? '' : info ? info.cls : '';
+  return `<label class="pill due ${cls}">📅 ${t.due ? esc(t.done ? fmt(t.due) : info.text) : '＋ Due date'}
+    <input type="date" data-change="setDue" data-id="${t.id}" value="${esc(t.due || '')}" aria-label="Due date"></label>`;
+}
+const calBtn = (t) => `<button class="pill" data-act="cal" data-id="${t.id}" aria-label="Add reminder to Calendar">🔔 Remind me</button>`;
+function upcoming(days = 7) {
+  const out = [];
+  S.areas.forEach((a) => a.goals.forEach((g) => { if (g.status === 'paused') return; g.tasks.forEach((t) => {
+    if (!t.done && t.due && daysUntil(t.due) <= days) out.push({ t, a });
+  }); }));
+  return out.sort((x, y) => x.t.due.localeCompare(y.t.due));
+}
+
+/* ---------------- calendar (.ics) ----------------
+   The phone's own Calendar app does the notifying, so this works on any iOS version and no data leaves the phone. */
+const icsEsc = (s) => String(s).replace(/\\/g, '\\\\').replace(/\r?\n/g, '\\n').replace(/([,;])/g, '\\$1');
+const icsDate = (s) => s.replace(/-/g, '');
+function icsFold(line) { const out = []; while (line.length > 72) { out.push(line.slice(0, 72)); line = ' ' + line.slice(72); } out.push(line); return out.join('\r\n'); }
+function buildIcs({ uid: id, title, desc, when, rrule, alarms }) {
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//North Star//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT',
+    `UID:${id}@northstar`, `DTSTAMP:${stamp}`, ...when, `SUMMARY:${icsEsc(title)}`, desc ? `DESCRIPTION:${icsEsc(desc)}` : '', rrule || '',
+    ...alarms.flatMap((tr) => ['BEGIN:VALARM', 'ACTION:DISPLAY', `DESCRIPTION:${icsEsc(title)}`, `TRIGGER:${tr}`, 'END:VALARM']),
+    'END:VEVENT', 'END:VCALENDAR'];
+  return lines.filter(Boolean).map(icsFold).join('\r\n') + '\r\n';
+}
+async function openIcs(ics, name) {
+  const file = `cal/${name}.ics`;
+  // Preferred: serve it from our own https address via the service worker → iPhone shows "Add to Calendar"
+  if ('caches' in window && navigator.serviceWorker?.controller) {
+    try {
+      await caches.delete('ns-ics');
+      await (await caches.open('ns-ics')).put(new Request(file), new Response(ics, { headers: { 'Content-Type': 'text/calendar; charset=utf-8' } }));
+      location.href = file; return;
+    } catch (e) { /* fall through */ }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a.download = `${name}.ics`;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function taskIcs(t, a) {
+  return buildIcs({
+    uid: `task-${t.id}`, title: `⭐ ${t.title}`, desc: `North Star · ${a.name}`,
+    when: [`DTSTART;VALUE=DATE:${icsDate(t.due)}`, `DTEND;VALUE=DATE:${icsDate(ds(addDays(parse(t.due), 1)))}`],
+    alarms: ['-PT15H', 'PT8H'], // 9am the day before, 8am on the day
+  });
+}
+function reviewIcs(time) {
+  const [h, m] = time.split(':');
+  const sun = ds(addDays(lastSunday(), 7 * (new Date().getDay() === 0 && new Date().getHours() < +h ? 0 : 1)));
+  return buildIcs({
+    uid: 'sunday-review', title: '⭐ Sunday Review · North Star', desc: 'Log wins, check progress, set next week’s Big 3. About 15 minutes.',
+    when: [`DTSTART:${icsDate(sun)}T${h}${m}00`, 'DURATION:PT20M'], rrule: 'RRULE:FREQ=WEEKLY;BYDAY=SU', alarms: ['-PT0M'],
+  });
+}
+
 const pinInput = (name, label) => `<label class="f">${label}</label><input type="password" name="${name}" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" required>`;
 function field(f) {
   const id = `f_${f.k}`;
@@ -613,6 +699,15 @@ function vSettings() {
 
   <div class="h2"><span>Appearance</span></div>
   <div class="seg">${['auto', 'light', 'dark'].map((v) => `<button class="${th === v ? 'on' : ''}" data-act="theme" data-v="${v}">${v === 'auto' ? 'Auto' : v === 'light' ? '☀️ Light' : '🌙 Dark'}</button>`).join('')}</div>
+
+  <div class="h2"><span>Reminders</span></div>
+  <div class="card">
+    <p class="small muted" style="margin-bottom:4px">Reminders go into your phone’s Calendar app, which sends the alerts. Nothing leaves your phone.</p>
+    <label class="f" for="reviewTime">Sunday Review reminder time</label>
+    <select id="reviewTime" data-change="reviewTime">${['09:00', '12:00', '16:00', '18:00', '19:00', '20:00', '21:00'].map((t) => `<option value="${t}" ${(S.settings.reviewTime || '19:00') === t ? 'selected' : ''}>${new Date(`2026-01-01T${t}`).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })}</option>`).join('')}</select>
+    <button class="btn soft block" style="margin-top:12px" data-act="calReview">🔔 Add weekly Sunday Review reminder</button>
+    <p class="tiny muted" style="margin-top:10px">For a step with a due date, tap <b>🔔 Remind me</b>: you’ll get an alert at 9am the day before and 8am on the day. Add each reminder once; adding it again creates a duplicate.</p>
+  </div>
 
   <div class="h2"><span>App lock</span></div>
   <div class="card">
@@ -733,6 +828,8 @@ const ACT = {
     LK = null; saveLock(); locked = false; pinBuf = ''; pinMsg = '';
     S = seed(); toast('Reset. Import your plan to continue.');
   },
+  cal: (d) => { const f = findTask(d.id); if (f && f.task.due) openIcs(taskIcs(f.task, f.area), 'north-star-reminder'); },
+  calReview: () => { openIcs(reviewIcs(S.settings.reviewTime || '19:00'), 'sunday-review'); },
   lockNow: () => { if (LK) { locked = true; pinBuf = ''; pinMsg = ''; window.scrollTo(0, 0); } },
   toggleTask: (d) => { const f = findTask(d.id); if (f) setTaskDone(f.task, !f.task.done); },
   toggleCustom: (d) => { const it = ensureDay().items.find((x) => x.id === d.id); if (it) { it.done = !it.done; if (it.done) cheer(); } },
@@ -885,6 +982,15 @@ document.addEventListener('submit', (e) => {
   const f = e.target.closest('form[data-form]'); if (!f) return;
   e.preventDefault(); const fn = FORMS[f.dataset.form]; if (!fn) return;
   fn(f, new FormData(f)); save(); render();
+});
+const CHANGES = {
+  setDue: (el) => { const f = findTask(el.dataset.id); if (f) { f.task.due = el.value || null; toast(el.value ? `📅 Due ${fmt(el.value)}` : 'Due date removed'); } },
+  reviewTime: (el) => { S.settings.reviewTime = el.value; },
+};
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-change]'); if (!el) return;
+  const fn = CHANGES[el.dataset.change]; if (!fn) return;
+  fn(el); save(); render();
 });
 $('#importFile').addEventListener('change', async (e) => {
   const file = e.target.files[0]; e.target.value = ''; if (!file) return;
