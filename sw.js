@@ -1,6 +1,6 @@
 // North Star service worker: always the latest version when online, still works offline.
 // Bump VERSION (and APP_VERSION in app.js) whenever you change app files.
-const VERSION = 'northstar-v4';
+const VERSION = 'northstar-v5';
 const SHELL = [
   './',
   './index.html',

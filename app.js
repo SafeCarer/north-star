@@ -2,7 +2,7 @@
 'use strict';
 
 const KEY = 'northstar.v1';
-const APP_VERSION = 4; // keep in step with VERSION in sw.js
+const APP_VERSION = 5; // keep in step with VERSION in sw.js
 const MAX_TODAY = 3;
 const AREA_ORDER = ['family', 'side', 'money', 'career', 'growth']; // priority for Today suggestions
 
@@ -104,7 +104,9 @@ function seed() {
       homeChip: '🏡 Settled home', roleChip: '💼 Next role',
       restNote: 'Recharge, see the people you love, and take 15 minutes for your review.',
       winHint: 'e.g. A good walk with family', skName: '', gig: '',
+      libbyKey: '', audible: '',
     },
+    listen: [],
     areas,
     habits: [
       { id: 'news', name: 'News', emoji: '📰', freq: 'daily' },
@@ -145,6 +147,7 @@ function migrate(s) {
   s.trackers = Object.assign({ apt: [], card: [], loan: [], uber: [], books: [], copilot: [], sk: [] }, s.trackers || {});
   s.config = Object.assign({}, base.config, s.config);
   s.profile = Object.assign({}, base.profile, s.profile);
+  if (!Array.isArray(s.listen)) s.listen = [];
   s.northStar ||= base.northStar; s.northStarDate ||= base.northStarDate;
   // keep the stored days small: drop day plans older than 90 days
   const cutoff = ds(addDays(new Date(), -90));
@@ -607,6 +610,66 @@ function vTrackers(k) {
   ${cfg.cycle ? '<p class="tiny muted" style="margin:0 4px">Tip: tap a status to move it to the next stage.</p>' : ''}
   `;
 }
+/* ---------------- listen ----------------
+   Podcasts open in Apple Podcasts; audiobooks open in Libby (your library) or Audible.
+   Your own list lives in your data (imported plan), not in this public code. */
+const CAT_EMOJI = { News: '📰', 'Marketing & AI': '📣', Business: '💼', Football: '⚽', Faith: '🙏', Audiobooks: '📚', Podcasts: '🎧' };
+const catEmoji = (c, kind) => CAT_EMOJI[c] || (kind === 'book' ? '📚' : '🎧');
+const enc = encodeURIComponent;
+const isApplePod = (u) => /^https:\/\/podcasts\.apple\.com\//i.test(u || '');
+const podUrl = (it) => (isApplePod(it.url) ? it.url : `https://podcasts.apple.com/ca/search?term=${enc(it.title)}`);
+const libbyUrl = (it) => (P().libbyKey ? `https://libbyapp.com/search/${enc(P().libbyKey)}/search/query-${enc(it.title)}/page-1` : 'https://libbyapp.com/');
+const audibleUrl = (it) => `https://${P().audible || 'www.audible.com'}/search?keywords=${enc(it.title + (it.by ? ' ' + it.by : ''))}`;
+const bookEntry = (it) => (it.bookId ? S.trackers.books.find((b) => b.id === it.bookId) : null);
+const BOOK_STEPS = [['Want to read', 'Want'], ['Reading', 'Reading'], ['Finished', 'Done']];
+
+function listenCard(it) {
+  const del = ui.edit ? `<button class="icon-btn" data-act="delListen" data-id="${it.id}" aria-label="Remove ${esc(it.title)}">🗑</button>` : '';
+  const head = `<div class="tile" style="--c:var(--accent)">${catEmoji(it.cat, it.kind)}</div>
+    <div class="meta"><div class="lt">${esc(it.title)}</div>${it.by ? `<div class="ls">${esc(it.by)}</div>` : ''}</div>`;
+  if (it.kind !== 'book') {
+    if (ui.edit) return `<div class="lcard">${head}${del}</div>`;
+    return `<a class="lcard" href="${esc(podUrl(it))}" target="_blank" rel="noopener">${head}
+      <span class="lgo">${isApplePod(it.url) ? 'Play ›' : 'Find ›'}</span></a>`;
+  }
+  const e = bookEntry(it); const st = e ? e.status : null;
+  return `<div class="lcard book">
+    <div class="lrow">${head}${st === 'Finished' ? '<span class="pill ok">Done ✓</span>' : st === 'Reading' ? '<span class="pill c">Reading</span>' : ''}${del}</div>
+    ${ui.edit ? '' : `<div class="btn-row">
+      <a class="btn" href="${esc(libbyUrl(it))}" target="_blank" rel="noopener">Libby</a>
+      <a class="btn ghost" href="${esc(audibleUrl(it))}" target="_blank" rel="noopener">Audible</a></div>
+    <div class="seg small" role="group" aria-label="Book status">${BOOK_STEPS.map(([v, l]) => `<button class="${st === v ? 'on' : ''}" data-act="bookSt" data-id="${it.id}" data-st="${v}">${l}</button>`).join('')}</div>`}
+  </div>`;
+}
+
+function vListen() {
+  const items = S.listen || [];
+  const cats = [...new Set(items.map((i) => i.cat))];
+  return `
+  <div class="top"><div><div class="sub">For the drive · tap to open</div><h1>Listen</h1></div></div>
+  <p class="tiny muted" style="margin:-6px 4px 6px">🚗 Pick before you start driving, then just press play.</p>
+  ${items.length ? '' : '<div class="card empty">Nothing here yet. Add your podcasts and audiobooks below.</div>'}
+  ${cats.map((c) => `<div class="h2"><span>${catEmoji(c)} ${esc(c)}</span></div>${items.filter((i) => i.cat === c).map(listenCard).join('')}`).join('')}
+
+  <details class="add" style="margin-top:20px">
+    <summary>＋ Add a podcast or audiobook</summary>
+    <form class="card" data-form="addListen">
+      <label class="f">Type</label>
+      <select name="kind"><option value="podcast">Podcast</option><option value="book">Audiobook</option></select>
+      <label class="f">Title</label><input type="text" name="title" required maxlength="120" autocomplete="off">
+      <label class="f">Host or author</label><input type="text" name="by" maxlength="80" autocomplete="off">
+      <label class="f">Group</label><input type="text" name="cat" list="listenCats" maxlength="40" placeholder="e.g. News" autocomplete="off">
+      <datalist id="listenCats">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist>
+      <label class="f">Apple Podcasts link (optional)</label><input type="url" name="url" placeholder="https://podcasts.apple.com/…" autocomplete="off">
+      <p class="tiny muted" style="margin-top:6px">In Apple Podcasts: open the show → ⋯ → Share → Copy Link. Leave blank and North Star will search for it instead.</p>
+      <button class="btn block" style="margin-top:14px">Add</button>
+    </form>
+  </details>
+  ${items.length ? `<button class="btn ghost block" data-act="editMode">${ui.edit ? 'Done editing' : 'Remove items'}</button>` : ''}
+  <p class="tiny muted" style="margin:12px 4px">Marking an audiobook “Reading” or “Done” adds it to your Books tracker.</p>
+  `;
+}
+
 /* ---------------- due dates ---------------- */
 function dueInfo(due) {
   const d = daysUntil(due);
@@ -829,6 +892,18 @@ const ACT = {
     LK = null; saveLock(); locked = false; pinBuf = ''; pinMsg = '';
     S = seed(); toast('Reset. Import your plan to continue.');
   },
+  bookSt: (d) => {
+    const it = (S.listen || []).find((x) => x.id === d.id); if (!it) return;
+    let e = bookEntry(it);
+    if (!e) { e = { id: uid(), ts: Date.now(), title: it.title, author: it.by || '', format: 'Audiobook', status: d.st, date: '' }; S.trackers.books.push(e); it.bookId = e.id; }
+    e.status = d.st;
+    if (d.st === 'Finished') { e.date ||= todayKey(); toast('📚 Done! Counted in your Books tracker'); }
+    else { e.date = ''; toast(d.st === 'Reading' ? '🎧 Enjoy the listen' : 'Saved for later'); }
+  },
+  delListen: (d) => {
+    const it = (S.listen || []).find((x) => x.id === d.id);
+    if (it && confirm(`Remove “${it.title}” from Listen?`)) S.listen = S.listen.filter((x) => x.id !== d.id);
+  },
   cal: (d) => { const f = findTask(d.id); if (f && f.task.due) openIcs(taskIcs(f.task, f.area), 'north-star-reminder'); },
   calReview: () => { openIcs(reviewIcs(S.settings.reviewTime || '19:00'), 'sunday-review'); },
   lockNow: () => { if (LK) { locked = true; pinBuf = ''; pinMsg = ''; window.scrollTo(0, 0); } },
@@ -891,6 +966,18 @@ const ACT = {
 };
 
 const FORMS = {
+  addListen: (f, fd) => {
+    const title = String(fd.get('title') || '').trim(); if (!title) return;
+    const kind = fd.get('kind') === 'book' ? 'book' : 'podcast';
+    const url = String(fd.get('url') || '').trim();
+    if (url && !isApplePod(url)) toast('That isn’t an Apple Podcasts link, so I’ll use a search instead');
+    (S.listen ||= []).push({
+      id: uid(), kind, title, by: String(fd.get('by') || '').trim(),
+      cat: String(fd.get('cat') || '').trim() || (kind === 'book' ? 'Audiobooks' : 'Podcasts'),
+      url: kind === 'podcast' && isApplePod(url) ? url : '',
+    });
+    if (!url || isApplePod(url)) toast(`Added ${title} ✓`);
+  },
   setPin: async (f, fd) => {
     const a = String(fd.get('pin1') || ''), b = String(fd.get('pin2') || '');
     if (!validPin(a)) return toast('PIN must be 4–6 digits');
@@ -957,7 +1044,7 @@ function render() {
   document.body.classList.remove('locked');
   lockEl.hidden = true; lockEl.innerHTML = '';
   const { v, arg } = route();
-  const views = { home: vHome, today: vToday, review: vReview, trackers: () => vTrackers(arg), area: () => vArea(arg), settings: vSettings };
+  const views = { home: vHome, today: vToday, listen: vListen, review: vReview, trackers: () => vTrackers(arg), area: () => vArea(arg), settings: vSettings };
   // keep open <details> state across re-renders
   const openAdd = document.querySelector('details.add')?.open;
   $('#app').innerHTML = (views[v] || vHome)();
